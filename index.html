@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>SERENOX :: Climate Control</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <style>
+        /* =========================================
+           VARIABLES Y TIPOGRAFÍA APPLE
+           ========================================= */
+        :root {
+            --bg-body: #eef2f6;
+            --bg-panel: rgba(255, 255, 255, 0.85);
+            --bg-active: rgba(248, 249, 250, 0.8);
+            --border-color: rgba(228, 231, 236, 0.6);
+            --text-main: #1d1d1f; 
+            --text-muted: #86868b;
+            
+            --theme-primary: #0071e3; 
+            --theme-primary-glow: rgba(0, 113, 227, 0.15);
+            --theme-secondary: #ff3b30; 
+            --theme-eco: #34c759; 
+            
+            --font-main: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
+            --transition-smooth: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        [data-theme="amber"] { --theme-primary: #f59e0b; --theme-primary-glow: rgba(245, 158, 11, 0.15); }
+        [data-theme="crimson"] { --theme-primary: #e11d48; --theme-primary-glow: rgba(225, 29, 72, 0.15); }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+
+        body {
+            background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+            color: var(--text-main); font-family: var(--font-main); font-size: 14px;
+            display: flex; justify-content: center; align-items: center;
+            height: 100dvh; width: 100vw; overflow: hidden;
+        }
+
+        #app-container {
+            width: 100%; height: 100%; max-width: 420px; background: transparent;
+            display: flex; flex-direction: column; position: relative;
+        }
+
+        @media (min-width: 421px) {
+            #app-container {
+                border-radius: 40px; border: 8px solid #ffffff;
+                height: 90vh; max-height: 850px;
+                box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); overflow: hidden;
+            }
+        }
+
+        /* GLASSMORPHISM */
+        .glass-header {
+            position: absolute; top: 0; left: 0; width: 100%;
+            padding: calc(20px + env(safe-area-inset-top, 0px)) 25px 15px 25px;
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(255, 255, 255, 0.65); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.4); z-index: 100;
+        }
+
+        .glass-nav {
+            position: absolute; bottom: 0; left: 0; width: 100%; 
+            height: calc(85px + env(safe-area-inset-bottom, 0px));
+            background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid rgba(255, 255, 255, 0.5);
+            display: flex; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom, 0px); z-index: 100; border-radius: 0 0 32px 32px;
+        }
+        @media (max-width: 420px) { .glass-nav { border-radius: 0; } }
+
+        /* HEADER & STATUS */
+        .brand h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.1; }
+        .brand h1 span { color: var(--theme-primary); }
+        .brand p { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+
+        .telemetry-top {
+            display: flex; align-items: center; gap: 6px; color: var(--text-main);
+            background: rgba(255,255,255,0.8); padding: 6px 12px; border-radius: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1px solid rgba(255,255,255,0.5); font-weight: 600; font-size: 12px; transition: 0.3s;
+        }
+        .batt-icon { font-size: 16px !important; color: var(--theme-eco); }
+        .telemetry-top.disconnected { background: #ffebee; color: var(--theme-secondary); border-color: #ffcdd2; }
+        .telemetry-top.disconnected .batt-icon { color: var(--theme-secondary); }
+
+        /* VISTAS */
+        .view {
+            flex: 1; display: none; flex-direction: column; position: relative;
+            padding: 100px 20px 110px 20px; overflow-y: auto; overflow-x: hidden;
+            animation: scaleIn var(--transition-smooth);
+        }
+        .view.active { display: flex; }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+
+        .card {
+            background: var(--bg-panel); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.6);
+            border-radius: 28px; padding: 24px; margin-bottom: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.04);
+        }
+
+        /* LOCK OVERLAY */
+        .hardware-lock {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(242, 244, 247, 0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            z-index: 50; display: flex; flex-direction: column; justify-content: center; align-items: center;
+            border-radius: 28px; text-align: center; padding: 20px; transition: opacity 0.5s;
+        }
+        .hardware-lock.hidden { opacity: 0; pointer-events: none; }
+        .lock-icon { font-size: 48px; color: var(--theme-primary); margin-bottom: 15px; opacity: 0.8; }
+        .lock-title { font-size: 18px; font-weight: 700; color: var(--text-main); margin-bottom: 8px; }
+        .lock-text { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px; }
+        
+        /* ANILLO DE TEMPERATURA */
+        .telemetry-ring-container { position: relative; width: 100%; max-width: 250px; aspect-ratio: 1; margin: 0 auto 15px auto; display: flex; justify-content: center; align-items: center; }
+        #svg-ring { transform: rotate(-90deg); width: 100%; height: 100%; filter: drop-shadow(0 4px 8px var(--theme-primary-glow)); }
+        .ring-bg { fill: none; stroke: rgba(0,0,0,0.04); stroke-width: 6; }
+        .ring-progress { fill: none; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 0.8s, stroke 0.5s; }
+        .ring-data { position: absolute; text-align: center; display: flex; flex-direction: column; align-items: center; }
+        .data-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+        .data-value { font-size: 64px; font-weight: 800; color: var(--text-main); line-height: 1; margin: 4px 0 8px 0; letter-spacing: -3px; }
+        .data-unit { font-size: 24px; color: var(--text-muted); vertical-align: super; font-weight: 500; }
+        .status-badge { background: var(--theme-primary-glow); color: var(--theme-primary); padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+
+        /* CONTROLES */
+        .panel-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; }
+        .panel-title { font-size: 16px; color: var(--text-main); font-weight: 700; letter-spacing: -0.3px; }
+        .panel-target { font-size: 24px; font-weight: 800; color: var(--theme-primary); line-height: 1; }
+        .panel-target span { font-size: 14px; color: var(--text-muted); font-weight: 600; }
+
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; outline: none; margin: 15px 0; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 12px; background: rgba(0,0,0,0.05); border-radius: 10px; }
+        input[type=range]::-webkit-slider-thumb {
+            height: 32px; width: 32px; border-radius: 50%; background: #ffffff; border: 1px solid rgba(0,0,0,0.1); box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            cursor: pointer; -webkit-appearance: none; margin-top: -10px; transition: transform 0.1s, box-shadow 0.1s;
+        }
+        input[type=range]:active::-webkit-slider-thumb { transform: scale(1.1); box-shadow: 0 6px 16px rgba(0,0,0,0.2); }
+
+        /* ASISTENTE IA */
+        .ai-header-smart { display: flex; flex-direction: column; align-items: center; margin-bottom: 25px; }
+        .ai-orb { width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, var(--theme-primary), #a855f7, #ec4899); background-size: 200% 200%; filter: blur(8px); opacity: 0.8; animation: gradientShift 4s ease infinite, float 3s ease-in-out infinite; margin-bottom: 10px; transition: all 0.3s; }
+        .ai-orb.listening { transform: scale(1.3); animation: gradientShift 1.5s ease infinite, pulseOrb 1s infinite; }
+        @keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes pulseOrb { 0% { filter: blur(8px); } 50% { filter: blur(15px); } 100% { filter: blur(8px); } }
+        .ai-title { font-size: 18px; font-weight: 700; color: var(--text-main); letter-spacing: -0.5px; }
+        
+        .ai-input-container { position: relative; width: 100%; margin-bottom: 15px; }
+        .ai-input { width: 100%; background: #ffffff; border: 1px solid rgba(0,0,0,0.08); color: var(--text-main); font-family: var(--font-main); font-size: 15px; padding: 16px 50px 16px 20px; border-radius: 24px; resize: none; outline: none; height: 100px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
+        .ai-input:focus { border-color: var(--theme-primary); box-shadow: 0 0 0 4px var(--theme-primary-glow); }
+        .mic-btn { position: absolute; bottom: 15px; right: 15px; background: var(--bg-body); border: none; color: var(--text-muted); border-radius: 50%; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: 0.2s; z-index: 5; }
+        .mic-btn.listening { background: var(--theme-primary); color: #ffffff; }
+
+        .btn-primary { background: var(--text-main); color: #ffffff; border: none; width: 100%; padding: 18px; border-radius: 20px; font-weight: 600; font-size: 15px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: 0.2s; }
+        .btn-primary:active { transform: scale(0.97); }
+        
+        .ai-result-box { margin-top: 15px; background: rgba(255,255,255,0.6); padding: 20px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.8); display: none; flex-direction: column; gap: 15px; animation: scaleIn 0.4s; }
+        .ai-temp-display { text-align: center; font-size: 42px; font-weight: 800; letter-spacing: -2px; color: var(--text-main); line-height: 1; }
+        .ai-analysis { font-size: 15px; color: var(--text-main); line-height: 1.5; font-weight: 500; min-height: 60px; }
+        .btn-apply { background: var(--theme-primary); color: #ffffff; border: none; width: 100%; padding: 14px; border-radius: 16px; font-weight: 600; font-size: 14px; cursor: pointer; transition: 0.2s; }
+
+        /* AJUSTES & FOTA PROGRESS */
+        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .setting-row:last-child { border-bottom: none; padding-bottom: 0; }
+        .setting-desc label { font-size: 16px; font-weight: 600; color: var(--text-main); display: block; letter-spacing: -0.3px; }
+        .setting-desc span { font-size: 13px; color: var(--text-muted); }
+        .btn-action { background: var(--bg-body); border: none; color: var(--theme-primary); font-family: var(--font-main); font-size: 13px; font-weight: 700; padding: 10px 16px; border-radius: 14px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 6px; }
+        .btn-action.loading { background: rgba(0,0,0,0.05); color: var(--text-muted); pointer-events: none; }
+        .btn-action.success { background: var(--theme-eco); color: white; }
+        .rotating { animation: rotate 1s linear infinite; }
+        
+        .fota-container { display: none; background: #fff; border: 1px solid rgba(0,0,0,0.1); border-radius: 16px; padding: 16px; margin-top: 10px; animation: scaleIn 0.3s; }
+        .fota-header { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; margin-bottom: 8px; color: var(--text-main); }
+        .fota-track { width: 100%; height: 8px; background: var(--bg-body); border-radius: 4px; overflow: hidden; }
+        .fota-bar { height: 100%; background: var(--theme-primary); width: 0%; transition: width 0.3s linear; }
+
+        /* NAVEGACIÓN INFERIOR */
+        .nav-btn { background: none; border: none; color: var(--text-muted); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; cursor: pointer; transition: 0.3s; flex: 1; padding: 10px 0; height: 100%; }
+        .nav-btn span:last-child { font-size: 11px; font-weight: 600; }
+        .nav-btn.active { color: var(--theme-primary); }
+        .nav-btn .material-icons { font-size: 26px; transition: 0.3s; }
+        .nav-btn.active .material-icons { transform: translateY(-3px) scale(1.1); }
+        
+        /* PANTALLA DE CARGA */
+        @keyframes girar { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+
+<body>
+
+    <div id="pantallaCarga" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0a0a; color: #00e5ff; z-index: 9999; flex-direction: column; justify-content: center; align-items: center; font-family: sans-serif;">
+        <h1 style="margin-bottom: 10px;">CLIMAX</h1>
+        <div style="border: 4px solid rgba(0, 229, 255, 0.3); border-top: 4px solid #00e5ff; border-radius: 50%; width: 40px; height: 40px; animation: girar 1s linear infinite;"></div>
+        <p style="margin-top: 20px; font-weight: bold;">Descargando iconos y configurando hardware...</p>
+        <p style="color: #666; font-size: 12px; margin-top: 5px;">(Esto solo pasará esta primera vez)</p>
+    </div>
+
+    <div id="app-container">
+        <header class="glass-header">
+            <div class="brand">
+                <h1>CLIMAX<span>.</span></h1>
+                <p id="app-version-txt">Firmware v1.0.4</p>
+            </div>
+            <div class="telemetry-top disconnected" id="top-status-badge">
+                <span id="batt-val">N/A</span>
+                <span class="material-icons batt-icon" id="batt-icon">bluetooth_disabled</span>
+            </div>
+        </header>
+
+        <main id="view-dashboard" class="view active">
+            
+            <div class="card" style="margin-top: 10px; position: relative;">
+                <div class="hardware-lock" id="lock-dash">
+                    <span class="material-icons lock-icon">bluetooth_searching</span>
+                    <div class="lock-title">Dispositivo Desconectado</div>
+                    <div class="lock-text">Vincula tu dispositivo para usar la app.</div>
+                    <button class="btn-apply" onclick="switchView('view-settings', document.querySelectorAll('.nav-btn')[2])">Ir a Ajustes</button>
+                </div>
+
+                <div class="telemetry-ring-container">
+                    <svg id="svg-ring" viewBox="0 0 100 100">
+                        <circle class="ring-bg" cx="50" cy="50" r="40"></circle>
+                        <circle class="ring-progress" id="ring-path" cx="50" cy="50" r="40" stroke="var(--theme-primary)" stroke-dasharray="251.2" stroke-dashoffset="100"></circle>
+                    </svg>
+                    <div class="ring-data">
+                        <span class="data-label">Temp. Dispositivo</span>
+                        <div class="data-value" id="current-temp-val">--<span class="data-unit">°C</span></div>
+                        <div class="status-badge" id="status-badge">
+                            <span class="material-icons" id="status-icon" style="font-size:14px;">power_off</span>
+                            <span id="status-text">OFFLINE</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="position: relative;">
+                <div class="hardware-lock" id="lock-controls"></div>
+                <div class="panel-header">
+                    <span class="panel-title">Termostato Objetivo</span>
+                    <div class="panel-target" id="target-temp-val">22<span>°C</span></div>
+                </div>
+                <input type="range" id="temp-slider" min="16" max="32" value="22" step="1">
+            </div>
+        </main>
+
+        <main id="view-ai" class="view">
+            <div class="card" style="position: relative;">
+                <div class="hardware-lock" id="lock-ai">
+                    <span class="material-icons lock-icon">memory</span>
+                    <div class="lock-title">Núcleo IA Pausado</div>
+                    <div class="lock-text">Vincula tu dispositivo para usar la app y recibir recomendaciones inteligentes.</div>
+                </div>
+
+                <div class="ai-header-smart">
+                    <div class="ai-orb" id="ai-orb"></div>
+                    <div class="ai-title">Asistente Climax</div>
+                </div>
+                
+                <div class="ai-input-container">
+                    <textarea id="ai-env-input" class="ai-input" placeholder="Ej: Entrenando al aire libre a 35°C..."></textarea>
+                    <button class="mic-btn" id="btn-mic-env"><span class="material-icons">mic</span></button>
+                </div>
+                
+                <button class="btn-primary" id="btn-analyze-env">
+                    <span class="material-icons" id="ai-btn-icon">auto_awesome</span> 
+                    <span id="ai-btn-text">Generar Clima Ideal</span>
+                </button>
+
+                <div class="ai-result-box" id="ai-result-box">
+                    <div class="ai-temp-display" id="ai-temp-val">22<span>°C</span></div>
+                    <p class="ai-analysis" id="ai-analysis-text"></p>
+                    <button class="btn-apply" id="btn-apply-ai">Aplicar al Dispositivo</button>
+                </div>
+            </div>
+        </main>
+
+        <main id="view-settings" class="view">
+            <div class="card">
+                <div class="panel-header"><span class="panel-title">Vínculos de Hardware</span></div>
+                <div class="setting-row">
+                    <div class="setting-desc">
+                        <label>Conexión Bluetooth (BLE)</label>
+                        <span id="ble-status-text">Dispositivo (Desconectado)</span>
+                    </div>
+                    <button class="btn-action" id="btn-link-bt"><span class="material-icons" style="font-size:18px;">bluetooth</span> Conectar</button>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-desc">
+                        <label>Actualización FOTA</label>
+                        <span>Instala nuevo firmware por aire</span>
+                    </div>
+                    <button class="btn-action" id="btn-update-fota" disabled style="opacity:0.5;"><span class="material-icons" style="font-size:18px;">cloud_download</span> Actualizar</button>
+                </div>
+                
+                <div class="fota-container" id="fota-panel">
+                    <div class="fota-header">
+                        <span id="fota-status-lbl">Preparando Dispositivo...</span>
+                        <span id="fota-percent">0%</span>
+                    </div>
+                    <div class="fota-track"><div class="fota-bar" id="fota-bar-fill"></div></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="panel-header"><span class="panel-title">Apariencia</span></div>
+                <div class="setting-row">
+                    <div class="setting-desc"><label>Acento Visual</label><span>Adapta el color del sistema</span></div>
+                    <div style="display:flex; gap:12px;">
+                        <div style="width:30px; height:30px; border-radius:50%; background:#0071e3;" onclick="setTheme('cyan')"></div>
+                        <div style="width:30px; height:30px; border-radius:50%; background:#f59e0b;" onclick="setTheme('amber')"></div>
+                        <div style="width:30px; height:30px; border-radius:50%; background:#e11d48;" onclick="setTheme('crimson')"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 25px; margin-bottom: 30px;">
+                <button id="btn-dev-mode" style="background: transparent; border: none; color: var(--text-muted); opacity: 0.2; font-size: 11px; font-weight: 600; cursor: pointer; padding: 10px;">Modo Desarrollador</button>
+            </div>
+        </main>
+
+        <nav class="glass-nav">
+            <button class="nav-btn active" onclick="switchView('view-dashboard', this)"><span class="material-icons">ac_unit</span><span>Control</span></button>
+            <button class="nav-btn" onclick="switchView('view-ai', this)"><span class="material-icons">memory</span><span>Smart IA</span></button>
+            <button class="nav-btn" onclick="switchView('view-settings', this)"><span class="material-icons">settings</span><span>Ajustes</span></button>
+        </nav>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            if (!localStorage.getItem("appIniciada")) {
+                document.getElementById("pantallaCarga").style.display = "flex";
+                setTimeout(() => {
+                    document.getElementById("pantallaCarga").style.display = "none";
+                    localStorage.setItem("appIniciada", "true");
+                }, 4000); 
+            }
+
+            const SERVICE_UUID = "19b10000-e8f2-537e-4f6c-d104768a1214"; 
+            const CHAR_TEMP_READ = "19b10001-e8f2-537e-4f6c-d104768a1214"; 
+            const CHAR_TEMP_WRITE = "19b10002-e8f2-537e-4f6c-d104768a1214"; 
+            const BATT_SERVICE_UUID = "battery_service"; 
+            const BATT_CHAR_UUID = "battery_level"; 
+
+            let bleDevice = null;
+            let bleServer = null;
+            let targetChar = null; 
+            let isConnected = false;
+            let simMode = false; 
+            
+            const btnLink = document.getElementById('btn-link-bt');
+            const bleStatusText = document.getElementById('ble-status-text');
+            const topBadge = document.getElementById('top-status-badge');
+            const battVal = document.getElementById('batt-val');
+            const battIcon = document.getElementById('batt-icon');
+            const btnFota = document.getElementById('btn-update-fota');
+            const locks = [document.getElementById('lock-dash'), document.getElementById('lock-controls'), document.getElementById('lock-ai')];
+
+            btnLink.addEventListener('click', async () => {
+                if(isConnected || simMode) return disconnectDevice();
+
+                triggerHaptic(30);
+
+                if (window.AndroidBridge) {
+                    window.AndroidBridge.iniciarBluetoothFisico();
+                } else {
+                    btnLink.innerHTML = '<span class="material-icons rotating" style="font-size:18px;">sync</span> Escaneando...';
+                    try {
+                        if (!navigator.bluetooth) throw new Error("Bluetooth no soportado.");
+
+                        bleDevice = await navigator.bluetooth.requestDevice({
+                            filters: [{ namePrefix: 'SERENOX' }, { namePrefix: 'ESP32' }, { namePrefix: 'CLIMAX' }],
+                            optionalServices: [SERVICE_UUID, BATT_SERVICE_UUID]
+                        });
+
+                        bleDevice.addEventListener('gattserverdisconnected', disconnectDevice);
+                        bleServer = await bleDevice.gatt.connect();
+
+                        try {
+                            const battService = await bleServer.getPrimaryService(BATT_SERVICE_UUID);
+                            const battChar = await battService.getCharacteristic(BATT_CHAR_UUID);
+                            await battChar.startNotifications();
+                            battChar.addEventListener('characteristicvaluechanged', handleBatteryRead);
+                            const initialBatt = await battChar.readValue();
+                            handleBatteryRead({ target: { value: initialBatt } });
+                        } catch (e) {}
+
+                        const tempService = await bleServer.getPrimaryService(SERVICE_UUID);
+                        const readChar = await tempService.getCharacteristic(CHAR_TEMP_READ);
+                        await readChar.startNotifications();
+                        readChar.addEventListener('characteristicvaluechanged', handleTempRead);
+
+                        targetChar = await tempService.getCharacteristic(CHAR_TEMP_WRITE);
+
+                        activateSystem("Dispositivo Climax");
+
+                    } catch (error) {
+                        console.error("Bluetooth Error:", error);
+                        const wantsSim = confirm("Modo PC: No se detectó hardware físico.\\n¿Deseas iniciar el Modo Simulación para probar la interfaz?");
+                        if (wantsSim) {
+                            simMode = true;
+                            activateSystem("Climax (Simulado)");
+                            startSimulationLoop();
+                        } else {
+                            btnLink.innerHTML = '<span class="material-icons" style="font-size:18px;">bluetooth</span> Conectar';
+                        }
+                    }
+                }
+            });
+
+            function activateSystem(deviceName) {
+                isConnected = true;
+                btnLink.classList.add('success');
+                btnLink.innerHTML = '<span class="material-icons" style="font-size:18px;">bluetooth_connected</span> Desconectar';
+                bleStatusText.innerText = deviceName;
+                btnFota.disabled = false; btnFota.style.opacity = 1;
+                topBadge.classList.remove('disconnected');
+                if(simMode) { battVal.innerText = "85%"; battIcon.textContent = "battery_full"; }
+                
+                locks.forEach(l => l.classList.add('hidden'));
+                triggerHaptic([50, 100]);
+            }
+
+            function disconnectDevice() {
+                if (bleDevice && bleDevice.gatt.connected) bleDevice.gatt.disconnect();
+                isConnected = false; simMode = false;
+                
+                btnLink.classList.remove('success');
+                btnLink.innerHTML = '<span class="material-icons" style="font-size:18px;">bluetooth</span> Conectar';
+                bleStatusText.innerText = "Dispositivo (Desconectado)";
+                btnFota.disabled = true; btnFota.style.opacity = 0.5;
+                topBadge.classList.add('disconnected');
+                battVal.innerText = "N/A"; battIcon.textContent = "bluetooth_disabled";
+                
+                currentVal.innerHTML = `--<span class="data-unit">°C</span>`;
+                document.getElementById('status-text').textContent = "OFFLINE";
+                document.getElementById('status-icon').textContent = "power_off";
+
+                locks.forEach(l => l.classList.remove('hidden')); 
+                triggerHaptic([100, 50, 100]);
+            }
+
+            function handleBatteryRead(event) {
+                const battLevel = event.target.value.getUint8(0);
+                battVal.innerText = `${battLevel}%`;
+                battIcon.textContent = battLevel < 20 ? "battery_alert" : "battery_full";
+                battIcon.style.color = battLevel < 20 ? "var(--theme-secondary)" : "var(--theme-eco)";
+            }
+
+            function handleTempRead(event) {
+                const tempFloat = event.target.value.getFloat32(0, true); 
+                updatePhysicalDisplay(tempFloat);
+            }
+
+            async function sendBluetoothCommand(temp) {
+                if (simMode) return; 
+                if (targetChar) {
+                    try {
+                        const buffer = new ArrayBuffer(4);
+                        new DataView(buffer).setFloat32(0, temp, true);
+                        await targetChar.writeValue(buffer);
+                    } catch (e) { console.error("Error escribiendo temp:", e); }
+                }
+            }
+
+            const slider = document.getElementById('temp-slider');
+            const targetVal = document.getElementById('target-temp-val');
+            const currentVal = document.getElementById('current-temp-val');
+            const ringPath = document.getElementById('ring-path');
+            const sText = document.getElementById('status-text');
+            const sIcon = document.getElementById('status-icon');
+            
+            let targetTemp = 22;   
+            let physicalTemp = 25; 
+            let ambientSafeTemp = 25; 
+            let peltierState = 'MANTENIENDO'; 
+            let pendingState = null; 
+
+            slider.addEventListener('input', () => {
+                targetTemp = parseInt(slider.value);
+                targetVal.innerHTML = `${targetTemp}<span>°C</span>`;
+                triggerHaptic(10);
+            });
+
+            slider.addEventListener('change', () => { 
+                evaluateThermalState();
+                sendBluetoothCommand(targetTemp); 
+            });
+
+            function evaluateThermalState() {
+                if(!isConnected && !simMode) return;
+                
+                let desiredState = 'MANTENIENDO';
+                if (targetTemp < Math.round(physicalTemp)) desiredState = 'ENFRIANDO';
+                else if (targetTemp > Math.round(physicalTemp)) desiredState = 'CALEFACCION';
+
+                if ((peltierState === 'ENFRIANDO' && desiredState === 'CALEFACCION') || 
+                    (peltierState === 'CALEFACCION' && desiredState === 'ENFRIANDO')) {
+                    peltierState = 'ESTABILIZANDO';
+                    pendingState = desiredState; 
+                } else if (peltierState !== 'ESTABILIZANDO') {
+                    peltierState = desiredState;
+                    pendingState = null;
+                }
+            }
+
+            function updatePhysicalDisplay(temp) {
+                physicalTemp = temp;
+                currentVal.innerHTML = `${Math.round(physicalTemp)}<span class="data-unit">°C</span>`;
+                updateRingUI();
+            }
+
+            function updateRingUI() {
+                const percent = Math.max(0, Math.min(1, ((physicalTemp - 16) / (32 - 16))));
+                const offset = 251.2 - (percent * 251.2);
+                ringPath.style.strokeDashoffset = offset;
+
+                if(!isConnected && !simMode) return;
+
+                if (peltierState === 'ESTABILIZANDO') {
+                    sText.textContent = "ESTABILIZANDO..."; 
+                    sIcon.textContent = "hourglass_empty"; 
+                    sIcon.style.color = "var(--theme-primary)";
+                } else if (peltierState === 'ENFRIANDO') { 
+                    sText.textContent = "ENFRIANDO"; 
+                    sIcon.textContent = "ac_unit"; 
+                    sIcon.style.color = "var(--theme-primary)";
+                } else if (peltierState === 'CALEFACCION') { 
+                    sText.textContent = "CALENTANDO"; 
+                    sIcon.textContent = "wb_sunny"; 
+                    sIcon.style.color = "var(--theme-secondary)";
+                } else { 
+                    sText.textContent = "MANTENIENDO"; 
+                    sIcon.textContent = "autorenew"; 
+                    sIcon.style.color = "var(--theme-eco)";
+                }
+            }
+
+            function startSimulationLoop() {
+                const simInt = setInterval(() => {
+                    if(!simMode) { clearInterval(simInt); return; }
+                    
+                    if (peltierState === 'ESTABILIZANDO') {
+                        if (physicalTemp < ambientSafeTemp) physicalTemp += 0.3;
+                        if (physicalTemp > ambientSafeTemp) physicalTemp -= 0.3;
+                        if (Math.abs(physicalTemp - ambientSafeTemp) <= 1.5) {
+                            peltierState = pendingState;
+                            pendingState = null;
+                        }
+                    } 
+                    else if (peltierState === 'ENFRIANDO') {
+                        physicalTemp -= 0.4;
+                        if (physicalTemp <= targetTemp) peltierState = 'MANTENIENDO';
+                    } 
+                    else if (peltierState === 'CALEFACCION') {
+                        physicalTemp += 0.4;
+                        if (physicalTemp >= targetTemp) peltierState = 'MANTENIENDO';
+                    } 
+                    else if (peltierState === 'MANTENIENDO') {
+                        physicalTemp += (Math.random() > 0.5 ? 0.15 : -0.15);
+                        if(physicalTemp > targetTemp + 1.5) peltierState = 'ENFRIANDO';
+                        if(physicalTemp < targetTemp - 1.5) peltierState = 'CALEFACCION';
+                    }
+                    updatePhysicalDisplay(physicalTemp);
+                }, 800);
+            }
+
+            const fotaPanel = document.getElementById('fota-panel');
+            const fotaBar = document.getElementById('fota-bar-fill');
+            const fotaStatus = document.getElementById('fota-status-lbl');
+            const fotaPercent = document.getElementById('fota-percent');
+
+            btnFota.addEventListener('click', async () => {
+                if(!isConnected && !simMode) return;
+                
+                const confirmUpdate = confirm("¿Iniciar actualización de Firmware V2.0?\\nEl dispositivo se reiniciará al finalizar.");
+                if(!confirmUpdate) return;
+
+                btnFota.disabled = true; fotaPanel.style.display = "block"; triggerHaptic([50, 50]);
+
+                const phases = ["Borrando Flash...", "Escribiendo partición OTA...", "Verificando Checksum...", "Reiniciando Sistema..."];
+                let progress = 0;
+                
+                const interval = setInterval(() => {
+                    progress += Math.floor(Math.random() * 8) + 2;
+                    if(progress > 100) progress = 100;
+                    
+                    fotaBar.style.width = `${progress}%`; fotaPercent.innerText = `${progress}%`;
+
+                    if(progress < 20) fotaStatus.innerText = phases[0];
+                    else if(progress < 80) fotaStatus.innerText = phases[1];
+                    else if(progress < 95) fotaStatus.innerText = phases[2];
+                    else fotaStatus.innerText = phases[3];
+
+                    if(progress === 100) {
+                        clearInterval(interval);
+                        setTimeout(() => {
+                            fotaPanel.style.display = "none"; fotaBar.style.width = "0%";
+                            document.getElementById('app-version-txt').innerText = "Firmware v2.0.0";
+                            btnFota.disabled = false; btnFota.innerHTML = '<span class="material-icons" style="font-size:18px;">check_circle</span> Al Día';
+                            triggerHaptic([100, 50, 100, 50, 200]);
+                            alert("FOTA Exitoso: El dispositivo ha sido actualizado por aire.");
+                        }, 1500);
+                    }
+                }, 400); 
+            });
+
+            // --- 4. INTELIGENCIA ARTIFICIAL (GOOGLE GEMINI - MODO SEGURO) ---
+            const geminiApiKey = "AIzaSyBFeaCUP3n62NA7VJlluZLydLMK5jm5NyI";
+
+            let suggestedAiTemp = 22;
+
+            function typeWriter(element, text, speed = 35) {
+                element.textContent = ''; let i = 0;
+                function type() { if (i < text.length) { element.textContent += text.charAt(i); i++; setTimeout(type, speed); } }
+                type();
+            }
+
+            async function callAIAPI(environmentText) {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+                
+                const combinedPrompt = "Eres Climax, un asistente climático inteligente. El usuario te dirá su entorno. Recomienda una temperatura ideal. Devuelve ÚNICAMENTE un formato JSON estricto con dos claves: 'temperatura' (un número entre 16 y 32) y 'analisis' (texto breve explicando por qué). Entorno del usuario: " + environmentText;
+                
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ role: "user", parts: [{ text: combinedPrompt }] }]
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        alert("Google rechazó la conexión. Código: " + response.status + "\\nDetalle: " + (data.error?.message || "Error desconocido"));
+                        throw new Error("Error HTTP " + response.status);
+                    }
+
+                    let rawText = data.candidates[0].content.parts[0].text;
+                    rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+                    
+                    const aiData = JSON.parse(rawText);
+                    
+                    suggestedAiTemp = aiData.temperatura;
+                    document.getElementById('ai-temp-val').innerHTML = `${suggestedAiTemp}<span>°C</span>`;
+                    document.getElementById('ai-result-box').style.display = 'flex';
+                    triggerHaptic([100, 50, 100]);
+                    typeWriter(document.getElementById('ai-analysis-text'), aiData.analisis);
+
+                    if ('speechSynthesis' in window) {
+                        window.speechSynthesis.cancel();
+                        const utterance = new SpeechSynthesisUtterance(aiData.analisis);
+                        utterance.lang = 'es-ES'; window.speechSynthesis.speak(utterance);
+                    }
+
+                } catch (error) {
+                    alert("Fallo interno detectado:\\n" + error.message);
+                    document.getElementById('ai-analysis-text').textContent = "Error: " + error.message;
+                    document.getElementById('ai-result-box').style.display = 'flex';
+                } finally {
+                    const btnAnalyze = document.getElementById('btn-analyze-env');
+                    btnAnalyze.disabled = false;
+                    document.getElementById('ai-orb').classList.remove('listening');
+                    document.getElementById('ai-btn-text').textContent = "Generar Clima Ideal";
+                }
+            }
+
+            const aiInput = document.getElementById('ai-env-input');
+            const btnAnalyze = document.getElementById('btn-analyze-env');
+            const btnApplyAi = document.getElementById('btn-apply-ai');
+
+            btnAnalyze.addEventListener('click', () => {
+                if(!aiInput.value.trim() || (!isConnected && !simMode)) return;
+                triggerHaptic(50); btnAnalyze.disabled = true;
+                document.getElementById('ai-orb').classList.add('listening'); 
+                document.getElementById('ai-btn-text').textContent = 'Iniciando escaneo...';
+                document.getElementById('ai-result-box').style.display = 'none'; 
+                callAIAPI(aiInput.value);
+            });
+
+            btnApplyAi.addEventListener('click', () => {
+                triggerHaptic(50);
+                slider.value = suggestedAiTemp; targetTemp = suggestedAiTemp;
+                targetVal.innerHTML = `${targetTemp}<span>°C</span>`;
+                evaluateThermalState();
+                sendBluetoothCommand(targetTemp); 
+                switchView('view-dashboard', document.querySelectorAll('.nav-btn')[0]);
+            });
+
+            // --- 5. MICRÓFONO ---
+            const btnMic = document.getElementById('btn-mic-env');
+            let isRecording = false;
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            let recognition;
+
+            if (SpeechRecognition) {
+                recognition = new SpeechRecognition();
+                recognition.lang = 'es-ES';
+                recognition.continuous = false;
+
+                recognition.onstart = () => {
+                    isRecording = true;
+                    btnMic.classList.add('listening'); document.getElementById('ai-orb').classList.add('listening');
+                    aiInput.placeholder = "Te estoy escuchando..."; triggerHaptic(50);
+                };
+
+                recognition.onresult = (event) => {
+                    aiInput.value = event.results[0][0].transcript; triggerHaptic(30);
+                };
+
+                recognition.onend = () => {
+                    isRecording = false;
+                    btnMic.classList.remove('listening'); document.getElementById('ai-orb').classList.remove('listening');
+                    aiInput.placeholder = "Escribe o dicta tu entorno...";
+                };
+
+                btnMic.addEventListener('click', () => {
+                    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+                    if (isRecording) recognition.stop();
+                    else try { recognition.start(); } catch (e) { recognition.stop(); }
+                });
+            } else { btnMic.style.display = 'none'; }
+
+
+            // --- 6. MODO DESARROLLADOR OCULTO (EL HUEVO DE PASCUA) ---
+            const btnDevMode = document.getElementById('btn-dev-mode');
+            btnDevMode.addEventListener('click', () => {
+                const pin = prompt("🛠️ MODO DESARROLLADOR\\nIngrese el PIN de seguridad:");
+                
+                if (pin === "1221") {
+                    triggerHaptic([50, 100]);
+                    alert("Acceso concedido. Activando entorno de simulación.");
+                    
+                    simMode = true;
+                    activateSystem("Hardware (Simulado)");
+                    startSimulationLoop();
+                    
+                    switchView('view-dashboard', document.querySelectorAll('.nav-btn')[0]);
+                } else if (pin !== null) {
+                    triggerHaptic([200, 50, 200]);
+                    alert("❌ PIN incorrecto.");
+                }
+            });
+
+            window.switchView = function(viewId, btnElement) {
+                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                document.getElementById(viewId).classList.add('active');
+                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                btnElement.classList.add('active'); triggerHaptic(20);
+            };
+            window.setTheme = function(themeName) {
+                document.documentElement.setAttribute('data-theme', themeName); triggerHaptic(30);
+            };
+            async function triggerHaptic(pattern) { if (navigator.vibrate) navigator.vibrate(pattern); }
+
+        });
+    </script>
+</body>
+</html>
